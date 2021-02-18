@@ -99,7 +99,7 @@ fn render_data_point(point: &DataPoint) -> impl Node {
 }
 
 fn get_point_on_model(model: ArrayView1<'_, f32>, (bound_x, bound_y): (f32, f32)) -> (f32, f32) {
-    if model[1] != 0 {
+    if model[1] != 0. {
         (bound_x, -(model[0] * bound_x + model[2]) / model[1])
     } else {
         (bound_x, bound_y)

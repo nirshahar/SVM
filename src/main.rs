@@ -7,7 +7,7 @@ use svg::{
 };
 
 const C: f32 = 1.;
-const RENDERED_POINT_RADIUS: f32 = 0.01;
+const RENDERED_POINT_RADIUS: f32 = 0.02;
 const VIEWBOX_INSET: f32 = 2. * RENDERED_POINT_RADIUS;
 
 struct DataPoint {
@@ -99,10 +99,13 @@ fn render_data_point(point: &DataPoint) -> impl Node {
 }
 
 fn get_point_on_model(model: ArrayView1<'_, f32>, (bound_x, bound_y): (f32, f32)) -> (f32, f32) {
+    // w_1 * x + w_2 * y + b = 0
     if model[1] != 0. {
+        // y = - (w_1 * x + b) / w_2
         (bound_x, -(model[0] * bound_x + model[2]) / model[1])
     } else {
-        (bound_x, bound_y)
+        // x = - (w_2 * y + b) / w_1
+        (-(model[1] * bound_y + model[2]) / model[0], bound_y)
     }
 }
 
@@ -120,6 +123,7 @@ fn render_line(
         .set("x2", x2)
         .set("y2", y2)
         .set("stroke", "black")
+        .set("stroke-width", RENDERED_POINT_RADIUS / 2.)
 }
 
 fn render_svg(data_points: &[DataPoint], model: ArrayView1<'_, f32>) -> Document {

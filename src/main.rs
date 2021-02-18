@@ -24,9 +24,8 @@ impl DataPoint {
             let tag = rng.gen_bool(0.5);
 
             let data = UnitDisc.sample(&mut rng);
-            let data = Array1::from(
-                [data[0] - 2. * (1. + (tag as i32 as f32) * 2.), data[1], 1.].to_vec(),
-            );
+            let data =
+                Array1::from([data[0] + 2. * (tag as i32 as f32) - 1., data[1], 1.].to_vec());
 
             let data_point = DataPoint { data, tag };
             data_points.push(data_point);

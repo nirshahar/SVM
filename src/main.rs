@@ -178,20 +178,16 @@ fn main() {
 
     // }
 
-    svg::save(
-        "out.svg",
-        &render_svg(
-            &data_points,
-            sgd(
-                &data_points,
-                Ix1(3),
-                100,
-                LEARNING_RATE,
-                BATCH_SIZE,
-                soft_svm_grad,
-            )
-            .view(),
-        ),
-    )
-    .unwrap();
+    let model = sgd(
+        &data_points,
+        Ix1(3),
+        1000,
+        LEARNING_RATE,
+        BATCH_SIZE,
+        soft_svm_grad,
+    );
+
+    println!("model: {}", model);
+
+    svg::save("out.svg", &render_svg(&data_points, model.view())).unwrap();
 }

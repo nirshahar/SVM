@@ -1,12 +1,10 @@
-use std::iter;
-
-use ndarray::{s, Array, Array1, ArrayView1, Ix1};
+use ndarray::{Array, Array1, ArrayView1, Ix1};
 use rand::{seq::SliceRandom, Rng};
 use rand_distr::{Distribution, UnitDisc};
 
+mod kernel;
 mod plot;
-
-const C: f32 = 1.;
+mod soft;
 
 pub struct DataPoint {
     data: Array1<f32>,
@@ -22,7 +20,14 @@ impl DataPoint {
             let tag = rng.gen_bool(0.5);
 
             let data: [f32; 2] = UnitDisc.sample(&mut rng);
-            let data = Array1::from([data[0] + bool_to_float(tag), data[1] + bool_to_float(tag) * 2., 1.].to_vec());
+            let data = Array1::from(
+                [
+                    data[0] + bool_to_float(tag),
+                    data[1] + bool_to_float(tag) * 2.,
+                    1.,
+                ]
+                .to_vec(),
+            );
 
             let data_point = DataPoint { data, tag };
             data_points.push(data_point);
@@ -36,15 +41,19 @@ fn bool_to_float(b: bool) -> f32 {
     2. * (b as i32 as f32) - 1.
 }
 
-/// An implementation for the stochastic gradient descent function.
-fn sgd<P>(
+/// An implementation for the stochastic gradient descent function with projection.
+/// The projection must be into a convex set.
+fn proj_sgd<P>(
     points: &[P],
-    dim: Ix1,
+    dim: usize,
     epochs: usize,
     learning_rate: f32,
     batch_size: usize,
     grad: impl Fn(&P, ArrayView1<'_, f32>) -> Array1<f32>,
+    proj: impl Fn(Array1<f32>) -> Array1<f32>,
 ) -> Array1<f32> {
+    let dim = Ix1(dim);
+
     let mut rng = rand::thread_rng();
     let mut optimum = Array::zeros(dim);
 
@@ -55,43 +64,30 @@ fn sgd<P>(
             .fold(Array::zeros(dim), |a, b| a + b)
             / (batch_size as f32);
 
-        optimum = optimum - learning_rate * average_gradient;
+        optimum = proj(optimum - learning_rate * average_gradient);
     }
 
     optimum
 }
 
-fn soft_svm_grad(data_point: &DataPoint, param_estimation: ArrayView1<'_, f32>) -> Array1<f32> {
-    let d = param_estimation.dim();
-
-    let y = bool_to_float(data_point.tag);
-    let data = &data_point.data;
-
-    let weight_grad: Array1<_> = param_estimation
-        .slice(s![0..d - 1])
-        .iter()
-        .copied()
-        .chain(iter::once(0.))
-        .collect();
-
-    if 1. - y * param_estimation.dot(data) >= 0. {
-        weight_grad - C * y * data
-    } else {
-        weight_grad
-    }
-}
-
-fn soft_svm_loss(data_points: &[DataPoint], param_estimation: &Array1<f32>) -> f32 {
-    let w = param_estimation.slice(s![0..param_estimation.dim() - 1]);
-
-    0.5 * w.dot(&w)
-        + data_points
-            .iter()
-            .map(|point| {
-                let value = C * (1. - bool_to_float(point.tag) * param_estimation.dot(&point.data));
-                value.max(0.)
-            })
-            .sum::<f32>()
+/// An implementation for the stochastic gradient descent function.
+fn sgd<P>(
+    points: &[P],
+    dim: usize,
+    epochs: usize,
+    learning_rate: f32,
+    batch_size: usize,
+    grad: impl Fn(&P, ArrayView1<'_, f32>) -> Array1<f32>,
+) -> Array1<f32> {
+    proj_sgd(
+        points,
+        dim,
+        epochs,
+        learning_rate,
+        batch_size,
+        grad,
+        std::convert::identity,
+    )
 }
 
 fn main() {
@@ -102,15 +98,15 @@ fn main() {
 
     let model = sgd(
         &data_points,
-        Ix1(3),
+        3,
         10000,
         LEARNING_RATE,
         BATCH_SIZE,
-        soft_svm_grad,
+        soft::grad,
     );
 
     println!("model: {}", model);
-    println!("loss: {}", soft_svm_loss(&data_points, &model));
+    println!("loss: {}", soft::loss(&data_points, &model));
 
     plot::plot_model(&data_points, model.view(), "WOOSH.svg");
 }

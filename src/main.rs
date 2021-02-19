@@ -58,7 +58,7 @@ fn proj_sgd<P>(
     let mut optimum = Array::zeros(dim);
 
     for _ in 0..epochs {
-        let average_gradient = points
+        let average_gradient: Array1<f32> = points
             .choose_multiple(&mut rng, batch_size)
             .map(|point| grad(point, optimum.view()))
             .fold(Array::zeros(dim), |a, b| a + b)
@@ -88,6 +88,27 @@ fn sgd<P>(
         grad,
         std::convert::identity,
     )
+}
+
+fn proj_gd<P>(
+    points: &[P],
+    dim: usize,
+    epochs: usize,
+    learning_rate: f32,
+    grad: impl Fn(&[P], ArrayView1<'_, f32>) -> Array1<f32>,
+    proj: impl Fn(Array1<f32>) -> Array1<f32>,
+) -> Array1<f32> {
+    let dim = Ix1(dim);
+
+    let mut optimum = Array::zeros(dim);
+
+    for _ in 0..epochs {
+        let grad_at_optimum = grad(points, optimum.view());
+
+        optimum = proj(optimum - learning_rate * grad_at_optimum);
+    }
+
+    optimum
 }
 
 fn main() {
